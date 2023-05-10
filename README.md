@@ -1,5 +1,5 @@
-# webs-turmas
-Turmas da disciplina de desenvolvimento WEB
+# Turmas de WEB
+Turmas da disciplina de desenvolvimento WEB do IFNMG Campus Salinas
 
 
-- [2023](2023.md)
+- [BSI 2022](2022.md)
