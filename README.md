@@ -1,6 +1,12 @@
-# Turmas de WEB
-Turmas da disciplina de desenvolvimento WEB do IFNMG Campus Salinas
+# Topicos
+Wagner Santos Duarte
 
-- [2023 - Sistemas de Informação](2023.md)
-- [2023 - Técnico em Informática](2023-ti.md)
-- [2022 - Sistemas de Informação](2022.md)
+Conhecimentos Adquiridos 
+
+- Python - Intermediário
+- HTML - Intermediário
+- JS - Intermediário
+- CSS - Intermediário
+- DJamgo - Basico
+- React - Basico
+
