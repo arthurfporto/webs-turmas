@@ -17,9 +17,8 @@ jobs:
       - name: Validar regras da PR
         run: |
           # Verifica se apenas 2025webi.md foi alterado
-          MODIFIED=$(git diff --name-only origin/main)
-          COUNT=$(echo "$MODIFIED" | wc -l)
-          if [[ "$COUNT" -ne 1 || "$MODIFIED" != "2025webi.md" ]]; then
+          MODIFIED=$(git diff --name-only origin/main | xargs)
+          if [[ "$MODIFIED" != "2025webi.md" ]]; then
             echo "Erro: Apenas o arquivo 2025webi.md pode ser alterado"
             exit 1
           fi
