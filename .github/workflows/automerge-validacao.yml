@@ -29,10 +29,6 @@ jobs:
             exit 1
           fi
 
-          ADDED=$(git diff origin/main -- 2025webi.md | grep "^+" | grep -v "^+++" | wc -l)
-          REMOVED=$(git diff origin/main -- 2025webi.md | grep "^-" | grep -v "^---" | wc -l)
-
-
           LINE=$(git diff origin/main -- 2025webi.md | grep "^+" | grep -v "^+++")
           if [[ ! "$LINE" =~ ^\+\- \[[^]]+\]\(https://github\.com/[^)]+\)$ ]]; then
             echo "Linha adicionada não segue o padrão"
