@@ -15,6 +15,7 @@ jobs:
           fetch-depth: 0
 
       - name: Validar regras da PR
+        shell: bash
         run: |
           # Verifica se apenas 2025webi.md foi alterado
           MODIFIED=$(git diff --name-only origin/main | xargs)
