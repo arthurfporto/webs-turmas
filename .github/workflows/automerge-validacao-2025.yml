@@ -35,7 +35,7 @@ jobs:
           # Verifica se pelo menos uma linha está no formato correto
           VALID=0
           while read -r LINE; do
-            if [[ "$LINE" =~ ^\+\- \[[^]]+\]\(https://github\.com/[^)]+\)$ ]]; then
+            if [[ "$LINE" =~ ^\+\- \\[[^]]+\\]\\(https://github\.com/[^)]+\\)$ ]]; then
               VALID=$((VALID+1))
             fi
           done <<< "$ADDED_LINES"
