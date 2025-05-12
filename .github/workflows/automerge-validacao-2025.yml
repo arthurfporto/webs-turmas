@@ -14,20 +14,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verifica mudanças
-        id: diff
-        run: |
-          FILES=$(git diff --name-only origin/main)
-          echo "FILES=$FILES" >> $GITHUB_ENV
-          echo "::set-output name=files::$FILES"
-
       - name: Validar regras da PR
         run: |
-          if [[ "$FILES" != "2025webi.md" ]]; then
+          # Verifica se apenas 2025webi.md foi alterado
+          MODIFIED=$(git diff --name-only origin/main)
+          COUNT=$(echo "$MODIFIED" | wc -l)
+          if [[ "$COUNT" -ne 1 || "$MODIFIED" != "2025webi.md" ]]; then
             echo "Erro: Apenas o arquivo 2025webi.md pode ser alterado"
             exit 1
           fi
 
+          # Coleta linhas adicionadas
           ADDED_LINES=$(git diff origin/main -- 2025webi.md | grep "^+" | grep -v "^+++" || true)
 
           if [[ -z "$ADDED_LINES" ]]; then
@@ -35,6 +32,7 @@ jobs:
             exit 1
           fi
 
+          # Verifica se pelo menos uma linha está no formato correto
           VALID=0
           while read -r LINE; do
             if [[ "$LINE" =~ ^\+\- \[[^]]+\]\(https://github\.com/[^)]+\)$ ]]; then
@@ -52,5 +50,3 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           merge-method: squash
-
-
