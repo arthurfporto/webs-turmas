@@ -1,0 +1,51 @@
+name: AutoAceitar PRs Simples
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validar-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Verifica mudanças
+        id: diff
+        run: |
+          FILES=$(git diff --name-only origin/main)
+          echo "FILES=$FILES" >> $GITHUB_ENV
+          echo "::set-output name=files::$FILES"
+
+      - name: Validar regras da PR
+        id: validar
+        run: |
+          if [[ "$FILES" != "2025webi.md" ]]; then
+            echo "Apenas 2025webi.md pode ser alterado"
+            exit 1
+          fi
+
+          ADDED=$(git diff origin/main -- 2025webi.md | grep "^+" | grep -v "^+++" | wc -l)
+          REMOVED=$(git diff origin/main -- 2025webi.md | grep "^-" | grep -v "^---" | wc -l)
+
+          if [[ "$ADDED" -ne 1 || "$REMOVED" -ne 0 ]]; then
+            echo "Somente uma linha deve ser adicionada sem remoções"
+            exit 1
+          fi
+
+          LINE=$(git diff origin/main -- 2025webi.md | grep "^+" | grep -v "^+++")
+          if [[ ! "$LINE" =~ ^\+\- \[[^]]+\]\(https://github\.com/[^)]+\)$ ]]; then
+            echo "Linha adicionada não segue o padrão"
+            echo "Linha: $LINE"
+            exit 1
+          fi
+
+      - name: Ativar auto-merge
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          merge-method: squash
