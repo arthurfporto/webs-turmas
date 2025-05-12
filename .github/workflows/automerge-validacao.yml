@@ -22,17 +22,28 @@ jobs:
           echo "::set-output name=files::$FILES"
 
       - name: Validar regras da PR
-        id: validar
         run: |
           if [[ "$FILES" != "2025webi.md" ]]; then
-            echo "Apenas 2025webi.md pode ser alterado"
+            echo "Erro: Apenas o arquivo 2025webi.md pode ser alterado"
             exit 1
           fi
 
-          LINE=$(git diff origin/main -- 2025webi.md | grep "^+" | grep -v "^+++")
-          if [[ ! "$LINE" =~ ^\+\- \[[^]]+\]\(https://github\.com/[^)]+\)$ ]]; then
-            echo "Linha adicionada não segue o padrão"
-            echo "Linha: $LINE"
+          ADDED_LINES=$(git diff origin/main -- 2025webi.md | grep "^+" | grep -v "^+++" || true)
+
+          if [[ -z "$ADDED_LINES" ]]; then
+            echo "Erro: Nenhuma linha foi adicionada ao arquivo 2025webi.md"
+            exit 1
+          fi
+
+          VALID=0
+          while read -r LINE; do
+            if [[ "$LINE" =~ ^\+\- \[[^]]+\]\(https://github\.com/[^)]+\)$ ]]; then
+              VALID=$((VALID+1))
+            fi
+          done <<< "$ADDED_LINES"
+
+          if [[ "$VALID" -lt 1 ]]; then
+            echo "Erro: Nenhuma linha adicionada está no formato correto."
             exit 1
           fi
 
