@@ -18,7 +18,11 @@ jobs:
         shell: bash
         run: |
           # Verifica se apenas 2025webi.md foi alterado
-          MODIFIED=$(git diff --name-only origin/main | xargs)
+          MODIFIED=$(git diff --name-only origin/main | xargs || true)
+
+          # Debugging output
+          echo "Arquivos modificados: $MODIFIED"
+
           if [[ "$MODIFIED" != "2025webi.md" ]]; then
             echo "Erro: Apenas o arquivo 2025webi.md pode ser alterado"
             exit 1
@@ -34,19 +38,4 @@ jobs:
 
           # Verifica se pelo menos uma linha está no formato correto
           VALID=0
-          while read -r LINE; do
-            if [[ "$LINE" =~ ^\+\- \\[[^]]+\\]\\(https://github\.com/[^)]+\\)$ ]]; then
-              VALID=$((VALID+1))
-            fi
-          done <<< "$ADDED_LINES"
-
-          if [[ "$VALID" -lt 1 ]]; then
-            echo "Erro: Nenhuma linha adicionada está no formato correto."
-            exit 1
-          fi
-
-      - name: Ativar auto-merge
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          merge-method: squash
+          while read -r LINE
