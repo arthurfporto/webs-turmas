@@ -1,0 +1,49 @@
+name: Auto Merge PRs that only change 2025webi.md
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  automerge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check changed files
+        id: file_check
+        run: |
+          CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files -q '.files[].path')
+          echo "Changed files: $CHANGED_FILES"
+          if [[ "$CHANGED_FILES" != "2025webi.md" ]]; then
+            echo "Only 2025webi.md can be modified. Exiting."
+            echo "allow_merge=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "allow_merge=true" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate added line format
+        if: steps.file_check.outputs.allow_merge == 'true'
+        id: format_check
+        run: |
+          git fetch origin main
+          git diff origin/main HEAD -- 2025webi.md > diff.txt
+          echo "DIFF OUTPUT:"
+          cat diff.txt
+
+          # Procura adição com o formato correto
+          if grep -P '^\+ - \[.+\]\(https://github\.com/.+\)$' diff.txt; then
+            echo "format_ok=true" >> $GITHUB_OUTPUT
+          else
+            echo "format_ok=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Enable GitHub Actions to auto-merge
+        if: steps.format_check.outputs.format_ok == 'true'
+        run: gh pr merge ${{ github.event.pull_request.number }} --auto --merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
