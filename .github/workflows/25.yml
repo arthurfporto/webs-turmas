@@ -1,0 +1,39 @@
+name: Auto Merge PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Check modified files
+        id: check_files
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            only_allowed:
+              - '2025webi.md'
+            other_files:
+              - '!2025webi.md'
+              - '**/*'
+
+      - name: Auto approve and merge if only 2025webi.md is modified
+        if: ${{ steps.check_files.outputs.only_allowed == 'true' && steps.check_files.outputs.other_files == 'false' }}
+        run: |
+          echo "Only 2025webi.md was modified, proceeding with auto-approval and merge"
+          gh pr review ${{ github.event.pull_request.number }} --approve
+          gh pr merge ${{ github.event.pull_request.number }} --merge
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment if other files are modified
+        if: ${{ steps.check_files.outputs.other_files == 'true' }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} --body "Este PR modificou outros arquivos além do 2025webi.md. O auto-merge só é permitido quando apenas o arquivo 2025webi.md é modificado."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
