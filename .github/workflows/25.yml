@@ -37,3 +37,4 @@ jobs:
           gh pr comment ${{ github.event.pull_request.number }} --body "Este PR modificou outros arquivos além do 2025webi.md. O auto-merge só é permitido quando apenas o arquivo 2025webi.md é modificado."
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
