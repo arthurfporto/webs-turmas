@@ -1,8 +1,12 @@
 name: Auto Merge PR
 
 on:
-  pull_request:
+  pull_request_target:  # Mudamos de pull_request para pull_request_target
     types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   auto-merge:
@@ -11,30 +15,48 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Check modified files
-        id: check_files
-        uses: dorny/paths-filter@v2
-        with:
-          filters: |
-            only_allowed:
-              - '2025webi.md'
-            other_files:
-              - '!2025webi.md'
-              - '**/*'
+        id: changed_files
+        run: |
+          # Fetch base branch for comparison
+          git fetch origin ${{ github.base_ref }}
+          
+          # Check if only 2025webi.md was modified
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD)
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Check if 2025webi.md is the only file changed
+          if [ "$(echo "$CHANGED_FILES" | wc -l)" -eq "1" ] && [ "$(echo "$CHANGED_FILES" | grep "^2025webi.md$")" ]; then
+            echo "only_allowed_file=true" >> $GITHUB_OUTPUT
+          else
+            echo "only_allowed_file=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Validate content format
         id: validate_content
-        if: ${{ steps.check_files.outputs.only_allowed == 'true' && steps.check_files.outputs.other_files == 'false' }}
+        if: ${{ steps.changed_files.outputs.only_allowed_file == 'true' }}
         run: |
-          git diff origin/${{ github.base_ref }} ${{ github.event.pull_request.head.sha }} -- 2025webi.md > diff.txt
+          # Get the diff content for 2025webi.md
+          git diff origin/${{ github.base_ref }} -- 2025webi.md > diff.txt
           
-          # Check if the diff contains added lines with the correct format
+          # Debug: print the diff
+          echo "Diff content:"
+          cat diff.txt
+          
+          # Check for added lines with the correct format
           ADDED_LINES=$(grep -E '^\+' diff.txt | grep -v '^\+\+\+' || echo "")
           
-          # Regular expression to match the format: - [Nome](https://github.com/username)
-          FORMAT_REGEX='^\+- \[[A-Za-z ]+\]\(https:\/\/github\.com\/[A-Za-z0-9_-]+\)
+          echo "Added lines:"
+          echo "$ADDED_LINES"
+          
+          # Regular expression for the format: - [Nome](https://github.com/username)
+          # More flexible regex to allow international characters, spaces, etc.
+          FORMAT_REGEX='^\+- \[.+\]\(https:\/\/github\.com\/[A-Za-z0-9_-]+\)'
           
           # Check if any added line matches the required format
           if echo "$ADDED_LINES" | grep -E "$FORMAT_REGEX" > /dev/null; then
@@ -46,24 +68,24 @@ jobs:
           fi
 
       - name: Auto approve and merge if valid content
-        if: ${{ steps.check_files.outputs.only_allowed == 'true' && steps.check_files.outputs.other_files == 'false' && steps.validate_content.outputs.valid == 'true' }}
+        if: ${{ steps.changed_files.outputs.only_allowed_file == 'true' && steps.validate_content.outputs.valid == 'true' }}
         run: |
           echo "Only 2025webi.md was modified with correct format, proceeding with auto-approval and merge"
           gh pr review ${{ github.event.pull_request.number }} --approve
           gh pr merge ${{ github.event.pull_request.number }} --merge
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
+          
       - name: Comment if format is invalid
-        if: ${{ steps.check_files.outputs.only_allowed == 'true' && steps.check_files.outputs.other_files == 'false' && steps.validate_content.outputs.valid != 'true' }}
+        if: ${{ steps.changed_files.outputs.only_allowed_file == 'true' && steps.validate_content.outputs.valid != 'true' }}
         run: |
           gh pr comment ${{ github.event.pull_request.number }} --body "O formato da entrada adicionada não segue o padrão requerido. Por favor, siga o formato: '- [Nome da Pessoa](https://github.com/username)'"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
 
       - name: Comment if other files are modified
-        if: ${{ steps.check_files.outputs.other_files == 'true' }}
+        if: ${{ steps.changed_files.outputs.only_allowed_file != 'true' }}
         run: |
           gh pr comment ${{ github.event.pull_request.number }} --body "Este PR modificou outros arquivos além do 2025webi.md. O auto-merge só é permitido quando apenas o arquivo 2025webi.md é modificado."
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.PAT_GITHUB }}
