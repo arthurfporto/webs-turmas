@@ -18,102 +18,102 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
-      - name: Check modified files
-        id: changed_files
+      - name: Check modified files and validate format
+        id: check_pr
         run: |
           # Fetch base branch for comparison
           git fetch origin ${{ github.base_ref }}
-
+          
           # Check if only 2025webi.md was modified
           CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}..HEAD)
-
+          
           echo "Changed files:"
           echo "$CHANGED_FILES"
-
+          
           # Check if 2025webi.md is the only file changed
           if [ "$(echo "$CHANGED_FILES" | wc -l)" -eq "1" ] && [ "$(echo "$CHANGED_FILES" | grep "^2025webi.md$")" ]; then
-            echo "only_allowed_file=true" >> $GITHUB_OUTPUT
+            echo "only_2025webi=true" >> $GITHUB_OUTPUT
+            
+            # Get the diff content for 2025webi.md
+            git diff origin/${{ github.base_ref }} -- 2025webi.md > diff.txt
+            
+            # Check for added lines with the correct format
+            ADDED_LINES=$(grep -E '^\+' diff.txt | grep -v '^\+\+\+' || echo "")
+            
+            # Regular expression for the format: - [Nome](https://github.com/username)
+            FORMAT_REGEX='^\+- \[.+\]\(https:\/\/github\.com\/[A-Za-z0-9_-]+\)'
+            
+            # Check if any added line matches the required format
+            if echo "$ADDED_LINES" | grep -E "$FORMAT_REGEX" > /dev/null; then
+              echo "valid_format=true" >> $GITHUB_OUTPUT
+            else
+              echo "valid_format=false" >> $GITHUB_OUTPUT
+            fi
           else
-            echo "only_allowed_file=false" >> $GITHUB_OUTPUT
+            echo "only_2025webi=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Validate content format
-        id: validate_content
-        if: ${{ steps.changed_files.outputs.only_allowed_file == 'true' }}
-        run: |
-          # Get the diff content for 2025webi.md
-          git diff origin/${{ github.base_ref }} -- 2025webi.md > diff.txt
-
-          # Debug: print the diff
-          echo "Diff content:"
-          cat diff.txt
-
-          # Check for added lines with the correct format
-          ADDED_LINES=$(grep -E '^\+' diff.txt | grep -v '^\+\+\+' || echo "")
-
-          echo "Added lines:"
-          echo "$ADDED_LINES"
-
-          # Regular expression for the format: - [Nome](https://github.com/username)
-          # More flexible regex to allow international characters, spaces, etc.
-          FORMAT_REGEX='^\+- \[.+\]\(https:\/\/github\.com\/[A-Za-z0-9_-]+\)'
-
-          # Check if any added line matches the required format
-          if echo "$ADDED_LINES" | grep -E "$FORMAT_REGEX" > /dev/null; then
-            echo "Valid format found in added content"
-            echo "valid=true" >> $GITHUB_OUTPUT
-          else
-            echo "No valid format found in added content"
-            echo "valid=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Usar uma action específica para comentários
-      - name: Comment on PR - Invalid Format
+      # Process PR using GitHub API
+      - name: Process Pull Request
         uses: actions/github-script@v6
-        if: ${{ steps.changed_files.outputs.only_allowed_file == 'true' && steps.validate_content.outputs.valid != 'true' }}
         with:
           github-token: ${{ secrets.PAT_GITHUB }}
           script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: 'O formato da entrada adicionada não segue o padrão requerido. Por favor, siga o formato: "- [Nome da Pessoa](https://github.com/username)"'
-            })
-
-      # Usar uma action específica para comentários
-      - name: Comment on PR - Other Files Modified
-        uses: actions/github-script@v6
-        if: ${{ steps.changed_files.outputs.only_allowed_file != 'true' }}
-        with:
-          github-token: ${{ secrets.PAT_GITHUB }}
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: 'Este PR modificou outros arquivos além do 2025webi.md. O auto-merge só é permitido quando apenas o arquivo 2025webi.md é modificado.'
-            })
-
-      # Aprovar e fazer merge se válido
-      - name: Auto approve and merge
-        uses: actions/github-script@v6
-        if: ${{ steps.changed_files.outputs.only_allowed_file == 'true' && steps.validate_content.outputs.valid == 'true' }}
-        with:
-          github-token: ${{ secrets.PAT_GITHUB }}
-          script: |
-            // Aprovar o PR
-            await github.rest.pulls.createReview({
-              pull_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              event: 'APPROVE'
-            });
-
-            // Fazer merge do PR
-            await github.rest.pulls.merge({
-              pull_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              merge_method: 'merge'
-            });
+            const only2025webi = '${{ steps.check_pr.outputs.only_2025webi }}' === 'true';
+            const validFormat = '${{ steps.check_pr.outputs.valid_format }}' === 'true';
+            
+            console.log(`Only 2025webi.md modified: ${only2025webi}`);
+            console.log(`Valid format: ${validFormat}`);
+            
+            // Determinar a ação com base nas verificações
+            if (only2025webi && validFormat) {
+              // Aprovar e fazer merge do PR
+              console.log("Approving and merging PR");
+              try {
+                await github.rest.pulls.createReview({
+                  pull_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  event: 'APPROVE'
+                });
+                
+                await github.rest.pulls.merge({
+                  pull_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  merge_method: 'merge'
+                });
+                
+                console.log("PR approved and merged successfully");
+              } catch (error) {
+                console.error("Error approving/merging PR:", error.message);
+              }
+            } else if (only2025webi && !validFormat) {
+              // Comentar sobre formato inválido
+              console.log("Adding comment about invalid format");
+              try {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: 'O formato da entrada adicionada não segue o padrão requerido. Por favor, siga o formato: "- [Nome da Pessoa](https://github.com/username)"'
+                });
+                console.log("Comment added successfully");
+              } catch (error) {
+                console.error("Error adding comment:", error.message);
+              }
+            } else {
+              // Comentar sobre outros arquivos modificados
+              console.log("Adding comment about other files modified");
+              try {
+                await github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: 'Este PR modificou outros arquivos além do 2025webi.md. O auto-merge só é permitido quando apenas o arquivo 2025webi.md é modificado.'
+                });
+                console.log("Comment added successfully");
+              } catch (error) {
+                console.error("Error adding comment:", error.message);
+              }
+            }
