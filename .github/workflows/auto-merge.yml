@@ -40,7 +40,7 @@ jobs:
 
       # Configurar o GitHub CLI
       - name: Setup GitHub CLI
-        uses: github/setup-gh@v2
+        uses: actions4gh/setup-gh@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
